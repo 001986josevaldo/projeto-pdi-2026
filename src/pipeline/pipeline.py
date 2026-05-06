@@ -1,9 +1,9 @@
 import cv2
-from pipeline.preprocessing import Preprocessing
-from pipeline.detection import Detection
-from pipeline.classification import Classification
-from pipeline.heatmap import Heatmap
-from utils.logger import Logger
+from .preprocessing import Preprocessing
+from src.pipeline.detection import Detection
+from src.pipeline.classification import Classification
+from src.pipeline.heatmap import Heatmap
+from src.pipeline.logger import Logger
 
 class PotholePipeline:
     def __init__(self, img_shape):

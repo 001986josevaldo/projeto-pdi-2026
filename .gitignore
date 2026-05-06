@@ -1,3 +1,4 @@
 annotations/
 images2/
 *.zip
+__pycache__
