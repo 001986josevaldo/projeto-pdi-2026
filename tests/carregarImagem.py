@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Exemplo de fluxo inicial
-img = cv2.imread('/media/josevaldo/E02A-3159/BCC/8_sem/PI/projeto_integrador/projeto-pdi-2026/assets/samples/images/potholes0.png')
+img = cv2.imread('../projeto-pdi-2026/assets/samples/images/potholes19.png')
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 blur = cv2.GaussianBlur(gray, (5, 5), 0)
 edges = cv2.Canny(blur, 50, 150) # Detecção de Bordas (Canny) exigida [6]
