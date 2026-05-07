@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk
 import time
+import datetime
 import numpy as np
 import csv
 import statistics
@@ -139,9 +140,25 @@ class SmartCityUI:
         if self.is_video:
             ret, frame = self.cap.read()
             if not ret:
-                # Se for um vídeo e acabar, ele reinicia (loop). Ignorado se for webcam.
-                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                self.root.after(10, self.update_frame)
+                # TOLERÂNCIA A FALHAS (Cabo desconectado)
+                # Cria uma tela preta de aviso
+                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(frame, "ERRO: Camera Desconectada!", (50, 240), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                cv2.putText(frame, "Tentando reconectar...", (50, 280), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                
+                # Tenta religar a câmera no background
+                self.cap = cv2.VideoCapture(0)
+                
+                # Renderiza o aviso e pausa o pipeline
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img_tk = ImageTk.PhotoImage(image=Image.fromarray(frame_rgb).resize((750, 450)))
+                self.video_label.imgtk = img_tk
+                self.video_label.configure(image=img_tk)
+                
+                # Aguarda 500ms e tenta o próximo frame
+                self.root.after(500, self.update_frame)
                 return
         else:
             if self.static_image is None:
@@ -190,8 +207,24 @@ class SmartCityUI:
         self.heatmap_label.configure(image=hm_tk)
 
         self.root.after(15, self.update_frame)
+        # No final do método update_frame(self), logo após calcular o fps:
+        if fps > 0 and fps < 1000: # Filtra ruídos de inicialização
+            self.fps_list.append(fps)
 
     def on_closing(self):
+        # Salvando log de telemetria
+        if len(self.fps_list) > 0:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f'results/fps_log_{timestamp}.csv'
+            with open(filename, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['Metrica', 'Valor (FPS)'])
+                writer.writerow(['Media', round(statistics.mean(self.fps_list), 2)])
+                writer.writerow(['Desvio-Padrao', round(statistics.stdev(self.fps_list) if len(self.fps_list) > 1 else 0, 2)])
+                writer.writerow(['Minimo', round(min(self.fps_list), 2)])
+                writer.writerow(['Maximo', round(max(self.fps_list), 2)])
+            print(f"Log de FPS salvo em {filename}")
+
         if self.cap:
             self.cap.release()
         self.root.destroy()
