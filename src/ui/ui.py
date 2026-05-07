@@ -1,5 +1,6 @@
 import sys
 import os
+import glob
 # Garante que o Python reconheça a raiz do projeto (projeto-pdi-2026)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
@@ -12,7 +13,7 @@ import datetime
 import numpy as np
 import csv
 import statistics
-
+from src.devices.camera_manager import CameraManager
 
 
 from src.pipeline.pipeline import PotholePipeline
@@ -31,6 +32,9 @@ class SmartCityUI:
         self.static_image = None
         self.is_video = True
         self.pipeline = None
+        self.cam_sources = []
+        self.current_cam_source = None
+        self.camera_name = tk.StringVar(value="Nenhuma")
 
         # Variáveis de Telemetria e Estado
         self.prev_frame_time = 0
@@ -40,8 +44,11 @@ class SmartCityUI:
         self.setup_ui()
         
         # Inicia com a Webcam por padrão
-        self.use_webcam()
+        self.camera_manager = CameraManager()
+        self.camera_manager.open_default_camera()
         self.update_frame()
+
+        
 
     def setup_ui(self):
         # --- PAINEL ESQUERDO: Visualização Principal ---
@@ -56,8 +63,11 @@ class SmartCityUI:
         self.control_frame.pack(fill=tk.X, pady=10)
 
         # Novos Botões de Fonte de Imagem
-        self.btn_webcam = tk.Button(self.control_frame, text="📷 Usar Webcam", command=self.use_webcam, bg="#16a085", fg="white")
+        self.btn_webcam = tk.Button(self.control_frame, text="📷 Alternar Webcam", command=self.start_webcam, bg="#16a085", fg="white")
         self.btn_webcam.pack(side=tk.LEFT, padx=5)
+
+        #self.btn_switch_camera = tk.Button(self.control_frame, text="🔄 Alternar Câmera", command=self.switch_camera_ui, bg="#1abc9c", fg="white")
+        #self.btn_switch_camera.pack(side=tk.LEFT, padx=5)
 
         self.btn_file = tk.Button(self.control_frame, text="📁 Carregar Foto/Vídeo", command=self.load_file, bg="#2980b9", fg="white")
         self.btn_file.pack(side=tk.LEFT, padx=5)
@@ -73,6 +83,9 @@ class SmartCityUI:
         self.lbl_fps = tk.Label(self.right_panel, text="FPS: 0", font=("Arial", 16, "bold"), fg="#2ecc71", bg="#2c3e50")
         self.lbl_fps.pack(pady=10)
 
+        #self.lbl_camera = tk.Label(self.right_panel, textvariable=self.camera_name, font=("Arial", 12), fg="white", bg="#2c3e50")
+        #self.lbl_camera.pack(pady=4)
+
         tk.Label(self.right_panel, text="Monitoramento de Severidade", font=("Arial", 14), fg="white", bg="#2c3e50").pack(pady=5)
         self.lbl_pequeno = tk.Label(self.right_panel, text="Pequenos: 0", font=("Arial", 12), fg="#2ecc71", bg="#2c3e50")
         self.lbl_pequeno.pack()
@@ -85,17 +98,32 @@ class SmartCityUI:
         self.heatmap_label = tk.Label(self.right_panel, bg="#000000")
         self.heatmap_label.pack()
 
-    # --- FUNÇÕES DE CONTROLE DE MÍDIA ---
-    def use_webcam(self):
-        if self.cap:
-            self.cap.release()
-        self.cap = cv2.VideoCapture(0)
-        self.is_video = True
-        self.static_image = None
-        
-        ret, frame = self.cap.read()
-        if ret:
-            self.pipeline = PotholePipeline(frame.shape)
+    def start_webcam(self):
+
+        success = self.camera_manager.open_default_camera()
+
+        if success:
+
+            self.is_video = True
+
+            self.static_image = None
+
+            self.camera_name.set(
+                self.camera_manager.current_source['name']
+            )
+
+
+    def switch_camera_ui(self):
+
+        success = self.camera_manager.switch_camera()
+
+        if success:
+
+            self.camera_name.set(
+                self.camera_manager.current_source['name']
+            )
+
+
 
     def load_file(self):
         # Abre o explorador de arquivos
@@ -138,18 +166,28 @@ class SmartCityUI:
     def update_frame(self):
         # 1. Obtendo o Frame (de vídeo/webcam ou da foto estática)
         if self.is_video:
-            ret, frame = self.cap.read()
-            if not ret:
+            if not self.camera_manager.is_opened():
+                ret = False
+                frame = None
+            else:
+                ret, frame = self.camera_manager.read()
+                if ret and frame is not None and self.pipeline is None:
+                    self.pipeline = PotholePipeline(frame.shape)
+
+            if not ret or frame is None:
                 # TOLERÂNCIA A FALHAS (Cabo desconectado)
                 # Cria uma tela preta de aviso
                 frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(frame, "ERRO: Camera Desconectada!", (50, 240), 
+                cv2.putText(frame, "Camera Desconectada!", (50, 240), 
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                 cv2.putText(frame, "Tentando reconectar...", (50, 280), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                 
                 # Tenta religar a câmera no background
-                self.cap = cv2.VideoCapture(0)
+                if self.current_cam_source:
+                    self.open_camera_source(self.current_cam_source)
+                else:
+                    self.camera_manager.open_default_camera()
                 
                 # Renderiza o aviso e pausa o pipeline
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -225,9 +263,12 @@ class SmartCityUI:
                 writer.writerow(['Maximo', round(max(self.fps_list), 2)])
             print(f"Log de FPS salvo em {filename}")
 
-        if self.cap:
-            self.cap.release()
-        self.root.destroy()
+        self.camera_manager.release()
+        try:
+            self.root.quit()
+            self.root.destroy()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     root = tk.Tk()

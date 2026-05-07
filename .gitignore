@@ -2,3 +2,6 @@ annotations/
 images2/
 *.zip
 __pycache__
+results/
+*.log
+*.csv
