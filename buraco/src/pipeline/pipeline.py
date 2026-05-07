@@ -3,7 +3,7 @@ from .preprocessing import Preprocessing
 from src.pipeline.detection import Detection
 from src.pipeline.classification import Classification
 from src.pipeline.heatmap import Heatmap
-from src.pipeline.logger import Logger
+#from src.pipeline.logger import Logger
 
 
 class PotholePipeline:
@@ -11,7 +11,7 @@ class PotholePipeline:
         self.pre = Preprocessing()
         self.det = Detection()
         self.cls = Classification(img_shape)
-        self.logger = Logger()
+        #self.logger = Logger()
         self.heatmap = Heatmap(img_shape)
 
     def process(self, img):
@@ -32,7 +32,7 @@ class PotholePipeline:
                 x, y, w, h = cv2.boundingRect(cnt)
                 severity = self.cls.classify(area)
 
-                self.logger.log("buraco", severity, (x,y))
+                #self.logger.log("buraco", severity, (x,y))
                 results.append((x,y,w,h,severity))
 
         self.heatmap.update(contours)

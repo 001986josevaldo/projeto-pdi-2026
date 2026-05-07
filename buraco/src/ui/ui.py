@@ -1,5 +1,6 @@
 import sys
 import os
+os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
 import glob
 # Garante que o Python reconheça a raiz do projeto (projeto-pdi-2026)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))

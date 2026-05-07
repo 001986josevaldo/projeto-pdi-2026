@@ -37,7 +37,7 @@ class CameraManager:
 
                 cap.release()
 
-        print(f"Câmeras detectadas: {self.sources}")
+        #print(f"Câmeras detectadas: {self.sources}")
 
         return self.sources
 
