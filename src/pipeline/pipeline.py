@@ -5,6 +5,7 @@ from src.pipeline.classification import Classification
 from src.pipeline.heatmap import Heatmap
 from src.pipeline.logger import Logger
 
+
 class PotholePipeline:
     def __init__(self, img_shape):
         self.pre = Preprocessing()

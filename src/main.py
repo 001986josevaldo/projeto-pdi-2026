@@ -1,12 +1,12 @@
 import os
 import cv2
-from src.pipeline.pipeline import PotholePipeline
+from .pipeline.pipeline import PotholePipeline
 
 # pega raiz do projeto
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 # monta caminho correto
-img_path = os.path.join(BASE_DIR, 'assets', 'samples', 'images', 'potholes19.png')
+img_path = os.path.join(BASE_DIR, 'assets', 'samples', 'images', 'potholes8.png')
 
 img = cv2.imread(img_path)
 
