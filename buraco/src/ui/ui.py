@@ -15,8 +15,6 @@ import numpy as np
 import csv
 import statistics
 from src.devices.camera_manager import CameraManager
-
-
 from src.pipeline.pipeline import PotholePipeline
 
 class SmartCityUI:
@@ -135,16 +133,21 @@ class SmartCityUI:
         if not filepath:
             return # O usuário cancelou a seleção
 
-        # Verifica se é imagem ou vídeo pela extensão
+        # Se for imagem, fecha a câmera e exibe apenas a foto
         if filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
-            if self.cap:
-                self.cap.release()
-            self.static_image = cv2.imread(filepath)
+            self.camera_manager.release()
+            self.current_cam_source = None
             self.is_video = False
-            self.pipeline = PotholePipeline(self.static_image.shape)
+            self.cap = None
+            self.static_image = cv2.imread(filepath)
+            self.camera_name.set("Foto carregada")
+            if self.static_image is not None:
+                self.pipeline = PotholePipeline(self.static_image.shape)
         else:
             if self.cap:
                 self.cap.release()
+            self.camera_manager.release()
+            self.current_cam_source = None
             self.cap = cv2.VideoCapture(filepath)
             self.is_video = True
             self.static_image = None

@@ -1,30 +1,18 @@
 import os
-import cv2
-from .pipeline.pipeline import PotholePipeline
+import sys
+import tkinter as tk
 
-# pega raiz do projeto
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
-# monta caminho correto
-img_path = os.path.join(BASE_DIR, 'assets', 'samples', 'images', 'potholes8.png')
+from src.ui.ui import SmartCityUI
 
-img = cv2.imread(img_path)
 
-# validação obrigatória (evita crash na banca)
-if img is None:
-    raise FileNotFoundError(f"Imagem não encontrada: {img_path}")
+def main():
+    root = tk.Tk()
+    SmartCityUI(root)
+    root.mainloop()
 
-pipeline = PotholePipeline(img.shape)
-
-results, heatmap = pipeline.process(img)
-
-for (x,y,w,h,sev) in results:
-    cv2.rectangle(img, (x,y), (x+w,y+h), (0,255,0), 2)
-    cv2.putText(img, sev, (x,y-10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
-
-cv2.imshow("Deteccao", img)
-cv2.imshow("Heatmap", heatmap)
-
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+if __name__ == "__main__":
+    main()

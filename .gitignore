@@ -5,3 +5,7 @@ __pycache__
 results/
 *.log
 *.csv
+*jpeg
+*.jpg
+*.png
+*.pdf
