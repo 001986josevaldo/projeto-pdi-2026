@@ -75,27 +75,21 @@ class Calibration:
 
                 cv2.circle(clone, (x,y), 5, (0,255,0), -1)
 
-        cv2.namedWindow("Bird Eye Calibration")
+        window_name = "Calibracao olho de passaro"
 
-        cv2.setMouseCallback(
-            "Bird Eye Calibration",
-            mouse
-        )
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.imshow(window_name, clone)
+        cv2.setMouseCallback(window_name, mouse)
 
         while True:
 
-            cv2.imshow(
-                "Bird Eye Calibration",
-                clone
-            )
+            cv2.imshow(window_name, clone)
 
             key = cv2.waitKey(1)
 
             if key == 13 and len(points) == 4:
                 break
 
-        cv2.destroyWindow(
-            "Bird Eye Calibration"
-        )
+        cv2.destroyWindow(window_name)
 
         return np.float32(points)

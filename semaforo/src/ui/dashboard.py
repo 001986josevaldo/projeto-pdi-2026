@@ -30,20 +30,39 @@ class Dashboard:
 
         # estado
         color = (255,255,255)
+        bg_color = (50, 50, 50)  # fundo padrão
 
         if state == "RED":
             color = (0,0,255)
+            #bg_color = (0, 0, 120)
 
         elif state == "GREEN":
             color = (0,255,0)
+            #bg_color = (0, 100, 0)
+
 
         elif state == "YELLOW":
             color = (0,255,255)
+            #bg_color = (0, 100, 100)
 
+        # retângulo de fundo colorido atrás do texto
+        cv2.rectangle(right_panel, (10, 78), (340, 115), bg_color, -1)
+        
+        # "Sinal:" sempre branco
         cv2.putText(
             right_panel,
-            f"STATE: {state}",
-            (20,100),
+            "Sinal: ",
+            (20, 108),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (255, 255, 255),
+            2
+        )
+        # somente o estado muda de cor
+        cv2.putText(
+            right_panel,
+            f" {state}",
+            (95, 108),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.9,
             color,
@@ -64,7 +83,7 @@ class Dashboard:
         # FPS
         cv2.putText(
             right_panel,
-            f"FPS: {fps:.2f}",
+            f"FPS: {int(fps)}",
             (20,220),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.8,
@@ -100,3 +119,4 @@ class Dashboard:
             y += 30
 
         return cv2.hconcat([frame, right_panel])
+    
