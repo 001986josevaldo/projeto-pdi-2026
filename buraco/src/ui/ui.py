@@ -39,7 +39,6 @@ class SmartCityUI:
         self.camera_name = tk.StringVar(value="Nenhuma")
 
         # Variáveis de Telemetria e Estado
-
         self.prev_frame_time = None
         self.calibration_mode = False
         self.last_heatmap_tk = None
@@ -48,17 +47,58 @@ class SmartCityUI:
         self.last_heatmap_img = None
         self.PIPELINE_SKIP = 2  # processa pipeline a cada N frames (ajuste: 2=mais preciso, 4=mais rápido)
 
-
         self.setup_ui()
         
         # Data Logger para eventos de buracos
         self.data_logger = DataLogger()
 
+        # --- APLICA CONFIGURAÇÕES DE HARDWARE ANTES DE ABRIR A CÂMERA ---
+        self.apply_v4l2_settings(2)
+
         # Inicia com a Webcam por padrão
         self.camera_manager = CameraManager()
         self.camera_manager.open_default_camera()
+        
+        # Força as configurações do OpenCV na inicialização
+        if self.camera_manager.is_opened():
+            self.camera_manager.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            self.camera_manager.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            self.camera_manager.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+            self.camera_manager.cap.set(cv2.CAP_PROP_FPS, 30)
+            self.camera_manager.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
         self.update_frame()
 
+    def apply_v4l2_settings(self, device_index=2):
+        """Força as configurações no hardware da câmera via V4L2"""
+        device_path = f"/dev/video{device_index}"
+        print(f"Aplicando configurações de hardware via V4L2 em {device_path}...")
+        
+        try:
+            if device_index == 2:
+                # --- CONFIGURAÇÕES DA LOGITECH C930e ---
+                os.system(f"v4l2-ctl -d {device_path} -v width=640,height=480,pixelformat=MJPG")
+                os.system(f"v4l2-ctl -d {device_path} -p 30")
+                
+                # Desliga queda de frame e crava exposição manual em 312
+                os.system(f"v4l2-ctl -d {device_path} -c exposure_dynamic_framerate=0")
+                os.system(f"v4l2-ctl -d {device_path} -c auto_exposure=1")
+                os.system(f"v4l2-ctl -d {device_path} -c exposure_time_absolute=312")
+            
+            elif device_index == 0:
+                # --- CONFIGURAÇÕES DA WEBCAM INTEGRADA ---
+                os.system(f"v4l2-ctl -d {device_path} -v width=640,height=480")
+                os.system(f"v4l2-ctl -d {device_path} -p 30")
+                
+                # Desliga "taxa de quadros dinâmicos" (Mantém os 30 FPS)
+                os.system(f"v4l2-ctl -d {device_path} -c exposure_dynamic_framerate=0")
+                
+                # Retorna para "Modo prioridade da abertura" (Controla luz sem perder FPS)
+                os.system(f"v4l2-ctl -d {device_path} -c auto_exposure=3")
+                
+        except Exception as e:
+            print(f"Aviso: Não foi possível aplicar as configurações V4L2 no dispositivo {device_index}: {e}")
+    
     def setup_ui(self):
         # --- PAINEL ESQUERDO: Visualização Principal ---
         self.left_panel = tk.Frame(self.root, bg="#34495e", width=640, height=480)
@@ -111,27 +151,37 @@ class SmartCityUI:
             self.cap.release()
             self.cap = None
 
+        # --- APLICA CONFIGURAÇÕES DE HARDWARE ANTES DE LIGAR A CÂMERA ---
+        self.apply_v4l2_settings()
+
         success = self.camera_manager.open_default_camera()
 
         if success:
             self.is_video = True
             self.static_image = None
             self.current_cam_source = self.camera_manager.current_source
+            
+            # Adicionado a configuração de 30 FPS no OpenCV
             self.camera_manager.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
             self.camera_manager.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
             self.camera_manager.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+            self.camera_manager.cap.set(cv2.CAP_PROP_FPS, 30) 
             self.camera_manager.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            self.prev_frame_time = None
-            self.fps_buffer = []          # ✅ LIMPA o buffer contaminado da foto
-            self.fps_list = []            # ✅ opcional: limpa o histórico também
             
-            # ALTERADO: Apenas reseta o texto sem alterar a hierarquia visual do layout
+            self.prev_frame_time = None
+            self.fps_buffer = []          
+            self.fps_list = []            
+            
             self.lbl_fps.config(text="FPS: --", fg="#2ecc71")
             self.camera_name.set(self.camera_manager.current_source['name'])
 
     def switch_camera_ui(self):
+        # Como a Logitech está no video2 de forma fixa no nosso hardware hack, 
+        # forçamos a configuração caso a câmera seja trocada
+        self.apply_v4l2_settings()
         success = self.camera_manager.switch_camera()
         if success:
+            self.camera_manager.cap.set(cv2.CAP_PROP_FPS, 30)
             self.camera_name.set(self.camera_manager.current_source['name'])
 
     def load_file(self):
@@ -143,7 +193,6 @@ class SmartCityUI:
             return 
 
         if filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
-            # ALTERADO: Modifica o texto em vez de dar pack_forget para evitar bugs visuais
             self.lbl_fps.config(text="FPS: N/A", fg="#7f8c8d")
             self.camera_manager.release()
             self.current_cam_source = None
@@ -163,7 +212,6 @@ class SmartCityUI:
             self.static_image = None
             self.prev_frame_time = None
             
-            # ALTERADO: Apenas redefine o texto original para o modo vídeo
             self.lbl_fps.config(text="FPS: --", fg="#2ecc71")
             
             ret, frame = self.cap.read()
@@ -211,7 +259,6 @@ class SmartCityUI:
                 else:
                     ret, frame = self.camera_manager.read()
                     if ret and frame is not None:
-                        # ✅ Resize único aqui — não redimensiona de novo depois
                         frame = cv2.resize(frame, (640, 480))
                         if self.pipeline is None:
                             self.pipeline = PotholePipeline(frame.shape)
@@ -240,7 +287,7 @@ class SmartCityUI:
             self.root.after(15, self.update_frame)
             return
 
-        # --- 2. Pipeline com SKIP DE FRAMES (✅ maior ganho de FPS) ---
+        # --- 2. Pipeline com SKIP DE FRAMES ---
         self.frame_counter += 1
         run_pipeline = (self.frame_counter % self.PIPELINE_SKIP == 0)
 
@@ -252,9 +299,9 @@ class SmartCityUI:
             except Exception:
                 import traceback
                 traceback.print_exc()
-                results = self.last_results  # usa resultado anterior em caso de erro
+                results = self.last_results  
         else:
-            results = self.last_results  # ✅ reusa detecções do frame anterior
+            results = self.last_results  
 
         # --- 3. Anotações Visuais e Contadores ---
         counts = {"pequeno": 0, "medio": 0, "grande": 0}
@@ -265,21 +312,21 @@ class SmartCityUI:
             cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
             cv2.putText(frame, severity.upper(), (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-        # --- 4. Atualizando Contadores UI (só quando pipeline rodou) ---
+        # --- 4. Atualizando Contadores UI ---
         if run_pipeline:
             self.lbl_pequeno.config(text=f"Pequenos: {counts['pequeno']}")
             self.lbl_medio.config(text=f"Médios: {counts['medio']}")
             self.lbl_grande.config(text=f"Grandes: {counts['grande']}")
 
-        # --- 5. ✅ Renderização sem segundo resize (frame já está em 750x450) ---
+        # --- 5. Renderização ---
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img_tk = ImageTk.PhotoImage(image=Image.fromarray(frame_rgb))
         self.video_label.imgtk = img_tk
         self.video_label.configure(image=img_tk)
 
-        # --- 6. Heatmap (só atualiza quando pipeline rodou) ---
+        # --- 6. Heatmap ---
         if heatmap_img is not None:
-            self.last_heatmap_img = heatmap_img  # ✅ removido .copy() desnecessário
+            self.last_heatmap_img = heatmap_img 
             heatmap_rgb = cv2.cvtColor(heatmap_img, cv2.COLOR_BGR2RGB)
             hm_tk = ImageTk.PhotoImage(image=Image.fromarray(heatmap_rgb))
             self.last_heatmap_tk = hm_tk
@@ -292,7 +339,7 @@ class SmartCityUI:
             self.heatmap_label.imgtk = hm_tk
             self.heatmap_label.configure(image=hm_tk)
 
-        # --- 7. ✅ Delay adaptativo ---
+        # --- 7. Delay adaptativo ---
         if self.is_video:
             self.root.after(1, self.update_frame)
         else:

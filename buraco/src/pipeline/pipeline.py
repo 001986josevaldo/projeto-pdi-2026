@@ -1,9 +1,10 @@
 import cv2
 from .preprocessing import Preprocessing
-from src.pipeline.detection import Detection
-from src.pipeline.classification import Classification
-from src.pipeline.heatmap import Heatmap
-#from src.pipeline.logger import Logger
+# imports relativos internos do pacote pipeline
+from .detection import Detection
+from .classification import Classification
+from .heatmap import Heatmap
+# from .logger import Logger
 
 
 class PotholePipeline:

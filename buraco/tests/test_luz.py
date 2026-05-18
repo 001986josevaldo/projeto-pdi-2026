@@ -1,7 +1,7 @@
 import cv2
 import os
 
-from src.pipeline.pipeline import PotholePipeline
+from buraco.src.pipeline.pipeline import PotholePipeline
 
 
 def ajustar_brilho(img, alpha):

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 import xml.etree.ElementTree as ET
-from src.pipeline.pipeline import PotholePipeline
+from buraco.src.pipeline.pipeline import PotholePipeline
 
 def load_ground_truth(annotations_folder, images_folder):
     ground_truth = {}
