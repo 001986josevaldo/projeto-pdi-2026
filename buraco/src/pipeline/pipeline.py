@@ -13,28 +13,35 @@ class PotholePipeline:
         self.cls = Classification(img_shape)
         #self.logger = Logger()
         self.heatmap = Heatmap(img_shape)
+        self.heatmap_counter = 0
 
     def process(self, img):
         processed = self.pre.apply(img)
-        mask = self.pre.to_hsv_mask(img)
-
-        edges = self.det.edges(processed)
-        clean = self.det.clean(edges)
-
+        mask = self.pre.to_hsv_mask(processed)
+        # Limpeza morfológica diretamente na máscara
+        clean = self.det.clean(mask)
         contours = self.det.contours(clean)
 
         results = []
-
+        min_area = self.cls.img_area * 0.0005
+        
         for cnt in contours:
             area = cv2.contourArea(cnt)
-
-            if area > 300:
+            
+            if area > min_area:
                 x, y, w, h = cv2.boundingRect(cnt)
                 severity = self.cls.classify(area)
 
                 #self.logger.log("buraco", severity, (x,y))
                 results.append((x,y,w,h,severity))
 
-        self.heatmap.update(contours)
+        heatmap_img = None
 
-        return results, self.heatmap.get_colormap()
+        self.heatmap_counter += 1
+
+        if self.heatmap_counter >= 10:
+            self.heatmap.update(contours)
+            heatmap_img = self.heatmap.get_colormap()
+            self.heatmap_counter = 0
+
+        return results, heatmap_img

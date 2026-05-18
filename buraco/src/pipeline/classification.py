@@ -5,9 +5,9 @@ class Classification:
     def classify(self, area):
         area_rel = area / self.img_area
 
-        if area_rel < 0.001:
+        if area_rel < 0.003:
             return "pequeno"
-        elif area_rel < 0.01:
+        elif area_rel < 0.02:
             return "medio"
         else:
             return "grande"

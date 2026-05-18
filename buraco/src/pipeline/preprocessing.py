@@ -5,13 +5,23 @@ class Preprocessing:
         self.blur_kernel = blur_kernel
 
     def apply(self, img):
+
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(gray, self.blur_kernel, 0)
+
+        # Equalização melhora robustez à luz
+        equalized = cv2.equalizeHist(gray)
+
+        blur = cv2.GaussianBlur(equalized, self.blur_kernel, 0)
+
         return blur
 
     def to_hsv_mask(self, img):
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        lower = (0, 0, 0)
-        upper = (180, 255, 80)
-        mask = cv2.inRange(hsv, lower, upper)
+
+        _, mask = cv2.threshold(
+            img,
+            70,
+            255,
+            cv2.THRESH_BINARY_INV
+        )
+
         return mask
