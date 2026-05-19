@@ -1,4 +1,3 @@
-# ui.py
 import sys
 import os
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
@@ -15,12 +14,9 @@ import datetime
 import numpy as np
 import csv
 import statistics
-from src.devices.camera_manager import CameraManager
-from src.pipeline.pipeline import PotholePipeline
-from src.utils.data_logger import DataLogger
-
-# ── IMPORT DA SUA NOVA CLASSE DE CONFIGURAÇÃO ──
-from src.devices.webcam_config import WebcamConfigurator
+from buraco.src.devices.camera_manager import CameraManager
+from buraco.src.pipeline.pipeline import PotholePipeline
+from buraco.src.utils.data_logger import DataLogger
 
 # ─────────────────────────────────────────────
 # CONFIGURAÇÃO GLOBAL: apenas a Webcam 2
@@ -57,16 +53,18 @@ class SmartCityUI:
 
         self.data_logger = DataLogger()
 
-        # ── Instancia a classe de configuração externa ──
+        # ── Sempre usa o índice fixo 2 ──
         self.current_device_index = FIXED_CAM_INDEX
-        self.webcam_config = WebcamConfigurator(device_index=self.current_device_index)
-        self.webcam_config.apply_v4l2_settings()
+        self.apply_v4l2_settings(self.current_device_index)
 
         self.camera_manager = CameraManager()
         self._open_fixed_camera()   # ← abre diretamente a câmera 2
 
         self.update_frame()
 
+    # ──────────────────────────────────────────────────────────
+    # Abre a câmera no índice fixo e configura os parâmetros
+    # ──────────────────────────────────────────────────────────
     def _open_fixed_camera(self):
         """Abre exclusivamente a webcam de índice FIXED_CAM_INDEX."""
         self.camera_manager.release()  # garante que não há câmera aberta
@@ -84,13 +82,30 @@ class SmartCityUI:
             'name': f'Webcam {FIXED_CAM_INDEX}'
         }
 
-        # Usa a classe externa para aplicar as propriedades do OpenCV
-        self.webcam_config.setup_camera_properties(cap)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        cap.set(cv2.CAP_PROP_FPS, 30)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         self.current_cam_source = self.camera_manager.current_source
         self.current_device_index = FIXED_CAM_INDEX
         self.camera_name.set(f'Webcam {FIXED_CAM_INDEX}')
         print(f"[CAM] Webcam {FIXED_CAM_INDEX} aberta com sucesso.")
+
+    def apply_v4l2_settings(self, current_device_index):
+        device_path = f"/dev/video{current_device_index}"
+        print(f"[V4L2] Aplicando otimizações em {device_path}...")
+        try:
+            os.system(f"v4l2-ctl -d {device_path} -v width=640,height=480,pixelformat=MJPG")
+            os.system(f"v4l2-ctl -d {device_path} -p 30")
+            os.system(f"v4l2-ctl -d {device_path} -c exposure_auto_priority=0 > /dev/null 2>&1")
+            os.system(f"v4l2-ctl -d {device_path} -c exposure_dynamic_framerate=0 > /dev/null 2>&1")
+            os.system(f"v4l2-ctl -d {device_path} -c exposure_auto=1 > /dev/null 2>&1")
+            os.system(f"v4l2-ctl -d {device_path} -c exposure_absolute=312 > /dev/null 2>&1")
+            print(f"[V4L2] Configurações aplicadas com sucesso em {device_path}")
+        except Exception as e:
+            print(f"[V4L2] Erro ao configurar {device_path}: {e}")
 
     def setup_ui(self):
         self.left_panel = tk.Frame(self.root, bg="#34495e", width=640, height=480)
@@ -102,6 +117,7 @@ class SmartCityUI:
         self.control_frame = tk.Frame(self.left_panel, bg="#34495e")
         self.control_frame.pack(fill=tk.X, pady=10)
 
+        # Botão renomeado: reabre a webcam 2 (sem alternância)
         self.btn_webcam = tk.Button(
             self.control_frame, text="📷 Webcam ",
             command=self.start_webcam, bg="#16a085", fg="white"
@@ -143,14 +159,7 @@ class SmartCityUI:
 
         tk.Label(self.right_panel, text="Mapa de Incidência (Heatmap)",
                  font=("Arial", 14), fg="white", bg="#2c3e50").pack(pady=20)
-        
-        self.placeholder_img = ImageTk.PhotoImage(Image.new("RGB", (320, 240), "#000000"))
-        
-        self.heatmap_label = tk.Label(
-            self.right_panel,
-            bg="#000000",
-            image=self.placeholder_img
-        )
+        self.heatmap_label = tk.Label(self.right_panel, bg="#000000")
         self.heatmap_label.pack()
 
     def start_webcam(self):
@@ -162,8 +171,7 @@ class SmartCityUI:
         self._open_fixed_camera()
 
         if self.camera_manager.is_opened():
-            # Substituído pela chamada do gerenciador externo
-            self.webcam_config.apply_v4l2_settings()
+            self.apply_v4l2_settings(self.current_device_index)
             self.is_video = True
             self.static_image = None
             self.prev_frame_time = None
@@ -183,21 +191,15 @@ class SmartCityUI:
         if not filepath:
             return
 
-        self.last_heatmap_img = None
-        self.last_heatmap_tk = None
-
         if filepath.lower().endswith(('.png', '.jpg', '.jpeg')):
             self.lbl_fps.config(text="FPS: N/A", fg="#7f8c8d")
             self.camera_manager.release()
             self.current_cam_source = None
             self.is_video = False
             self.cap = None
-            
-            raw_img = cv2.imread(filepath)
+            self.static_image = cv2.imread(filepath)
             self.camera_name.set("Foto carregada")
-            
-            if raw_img is not None:
-                self.static_image = cv2.resize(raw_img, (640, 480))
+            if self.static_image is not None:
                 self.pipeline = PotholePipeline(self.static_image.shape)
         else:
             if self.cap:
@@ -261,11 +263,9 @@ class SmartCityUI:
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                 cv2.putText(frame, "Tentando reconectar...", (50, 270),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                
-                # Substituído pelo gerenciador externo no fluxo de reconexão
-                self.webcam_config.apply_v4l2_settings()
+                self.apply_v4l2_settings(self.current_device_index)
                 if self.current_cam_source:
-                    self._open_fixed_camera()
+                    self._open_fixed_camera()   # ← reconecta sempre na câmera 2
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 img_tk = ImageTk.PhotoImage(image=Image.fromarray(frame_rgb))
                 self.video_label.imgtk = img_tk
@@ -321,16 +321,11 @@ class SmartCityUI:
 
         if heatmap_img is not None:
             self.last_heatmap_img = heatmap_img
-
             heatmap_rgb = cv2.cvtColor(heatmap_img, cv2.COLOR_BGR2RGB)
-            pil_img = Image.fromarray(heatmap_rgb)
-            pil_img = pil_img.resize((320, 240), Image.Resampling.LANCZOS)
-
-            hm_tk = ImageTk.PhotoImage(pil_img)
+            hm_tk = ImageTk.PhotoImage(image=Image.fromarray(heatmap_rgb))
             self.last_heatmap_tk = hm_tk
             self.heatmap_label.imgtk = hm_tk
             self.heatmap_label.configure(image=hm_tk)
-
         elif self.last_heatmap_img is None:
             placeholder = np.zeros((240, 320, 3), dtype=np.uint8)
             self.last_heatmap_img = placeholder

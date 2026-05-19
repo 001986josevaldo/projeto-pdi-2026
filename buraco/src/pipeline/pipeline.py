@@ -37,12 +37,8 @@ class PotholePipeline:
                 results.append((x,y,w,h,severity))
 
         heatmap_img = None
-
-        self.heatmap_counter += 1
-
-        if self.heatmap_counter >= 10:
-            self.heatmap.update(contours)
-            heatmap_img = self.heatmap.get_colormap()
-            self.heatmap_counter = 0
-
+        
+        self.heatmap.update(contours)
+        heatmap_img = self.heatmap.get_colormap()
+        
         return results, heatmap_img
