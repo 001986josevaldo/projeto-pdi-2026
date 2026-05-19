@@ -16,14 +16,13 @@ import numpy as np
 import csv
 import statistics
 from src.devices.camera_manager import CameraManager
+from src.devices.webcam_config import WebcamConfigurator
 from src.pipeline.pipeline import PotholePipeline
 from src.utils.data_logger import DataLogger
 
-# ── IMPORT DA SUA NOVA CLASSE DE CONFIGURAÇÃO ──
-from src.devices.webcam_config import WebcamConfigurator
 
 # ─────────────────────────────────────────────
-# CONFIGURAÇÃO GLOBAL: apenas a Webcam 2
+# CONFIGURAÇÃO GLOBAL: apenas a Webcam 
 FIXED_CAM_INDEX = 2
 # ─────────────────────────────────────────────
 
